@@ -31,7 +31,7 @@ app.MapPost("/api/categoria/cadastrar", ([FromServices] AppDataContext ctx, [Fro
 
 //ENDPOINTS DE TAREFA
 //GET: http://localhost:5273/api/tarefas/listar
-app.MapGet("/api/tarefas/listar", ([FromServices] AppDataContext ctx) =>
+app.MapGet("/api/tarefa/listar", ([FromServices] AppDataContext ctx) =>
 {
     if (ctx.Tarefas.Any())
     {
@@ -41,7 +41,7 @@ app.MapGet("/api/tarefas/listar", ([FromServices] AppDataContext ctx) =>
 });
 
 //POST: http://localhost:5273/api/tarefas/cadastrar
-app.MapPost("/api/tarefas/cadastrar", ([FromServices] AppDataContext ctx, [FromBody] Tarefa tarefa) =>
+app.MapPost("/api/tarefa/cadastrar", ([FromServices] AppDataContext ctx, [FromBody] Tarefa tarefa) =>
 {
     Categoria? categoria = ctx.Categorias.Find(tarefa.CategoriaId);
     if (categoria == null)
@@ -55,21 +55,45 @@ app.MapPost("/api/tarefas/cadastrar", ([FromServices] AppDataContext ctx, [FromB
 });
 
 //PUT: http://localhost:5273/tarefas/alterar/{id}
-app.MapPut("/api/tarefas/alterar/{id}", ([FromServices] AppDataContext ctx, [FromRoute] string id) =>
+app.MapPut("/api/tarefa/alterar/{id}", async (int id, AppDataContext ctx) =>
 {
-    //Implementar a alteração do status da tarefa
+    var tarefa = await ctx.Tarefas.FindAsync(id);
+    if (tarefa == null)
+    {
+        return Results.NotFound("Tarefa não encontrada.");
+    }
+
+
+    tarefa.Status = tarefa.Status switch
+    {
+        "Não iniciada" => "Em andamento",
+        "Em andamento" => "Concluída",
+        _ => tarefa.Status
+    };
+
+    ctx.Tarefas.Update(tarefa);
+    await ctx.SaveChangesAsync();
+    return Results.Ok(tarefa);
 });
 
+
 //GET: http://localhost:5273/tarefas/naoconcluidas
-app.MapGet("/api/tarefas/naoconcluidas", ([FromServices] AppDataContext ctx) =>
+app.MapGet("/api/tarefa/naoconcluidas", async (AppDataContext ctx) =>
 {
-    //Implementar a listagem de tarefas não concluídas
+    var tarefas = await ctx.Tarefas
+        .Include(t => t.Categoria)
+        .Where(t => t.Status != "Concluída")
+        .ToListAsync();
+    return tarefas.Any() ? Results.Ok(tarefas) : Results.NotFound();
 });
 
 //GET: http://localhost:5273/tarefas/concluidas
-app.MapGet("/api/tarefas/concluidas", ([FromServices] AppDataContext ctx) =>
+app.MapGet("/api/tarefa/concluidas", async (AppDataContext ctx) =>
 {
-    //Implementar a listagem de tarefas concluídas
+    var tarefas = await ctx.Tarefas
+        .Include(t => t.Categoria)
+        .Where(t => t.Status == "Concluída")
+        .ToListAsync();
+    return tarefas.Any() ? Results.Ok(tarefas) : Results.NotFound();
 });
-
 app.Run();
